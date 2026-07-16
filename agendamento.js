@@ -19,7 +19,7 @@ async function removerFeriadosDaLista(diasArray, mes, ano) {
         const dataFormatada = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
         
         try {
-            const response = await fetch(`${API_URL_FERIADOS}/api/atendimento/existeFeriado?data=${dataFormatada}`);
+            const response = await fetch(`${API_URL_FERIADOS}/api/Atendimento/obterFeriado?data=${dataFormatada}`);
             if (response.ok) {
                 const isFeriado = await response.json();
                 if (!isFeriado) {
