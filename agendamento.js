@@ -9,10 +9,8 @@ document.addEventListener("keydown", (e) => {
 	}
 });
 
-// ====================================================================
-// NOVA INTEGRAÇÃO: API DE FERIADOS
-// ====================================================================
-const API_URL_FERIADOS = "https://sua-api.com.br"; // <-- COLOQUE SUA URL AQUI
+
+const API_URL_FERIADOS = "https://localhost:7022";
 
 async function removerFeriadosDaLista(diasArray, mes, ano) {
     const diasUteis = [];
@@ -24,21 +22,19 @@ async function removerFeriadosDaLista(diasArray, mes, ano) {
             const response = await fetch(`${API_URL_FERIADOS}/api/atendimento/existeFeriado?data=${dataFormatada}`);
             if (response.ok) {
                 const isFeriado = await response.json();
-                // Se NÃO for feriado, adicionamos na lista de dias úteis
                 if (!isFeriado) {
                     diasUteis.push(dia);
                 }
             } else {
-                diasUteis.push(dia); // Se der erro na API, mantemos o dia por segurança
+                diasUteis.push(dia);
             }
         } catch (error) {
             console.error("Erro ao consultar feriado para o dia", dataFormatada, error);
-            diasUteis.push(dia); // Fallback em caso de erro de rede
+            diasUteis.push(dia);
         }
     }
     return diasUteis;
 }
-// ====================================================================
 
 async function setupToken() {
     const authResponse = await fetch(`${urlSchedule}/auth/access-token`, {
@@ -430,10 +426,8 @@ async function loadScript() {
         preloader.style.display = "none";
         const result = response[0];
 
-        // --- NOVA INTEGRAÇÃO: FILTRA QUANDO TROCA O ANO ---
         const mesAtualSelect = $(tipoAtendimento === 1 ? "#mes-input" : "#mes-input-2").val() || new Date().getMonth() + 1;
         result.dias = await removerFeriadosDaLista(result.dias, mesAtualSelect, year);
-        // --------------------------------------------------
 
         const diaEleme = $("#dia-input");
         const diaEleme2 = $("#dia-input-2");
