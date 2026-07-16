@@ -10,7 +10,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 
-const API_URL_FERIADOS = "https://localhost:7022";
+const API_URL_FERIADOS = "https://apiarearestritagenericainthm.capef.com.br";
 
 async function removerFeriadosDaLista(diasArray, mes, ano) {
     const diasUteis = [];
