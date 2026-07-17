@@ -1,39 +1,52 @@
 document.addEventListener("contextmenu", (e) => {
-	e.preventDefault();
+    e.preventDefault();
 }, false);
 
 document.addEventListener("keydown", (e) => {
-	if (e.ctrlKey || e.keyCode == 123) {
-		e.stopPropagation();
-		e.preventDefault();
-	}
+    if (e.ctrlKey || e.keyCode == 123) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
 });
 
-
 const API_URL_FERIADOS = "https://apiarearestritagenericainthm.capef.com.br";
+const urlSchedule = "https://apiagendamento.capef.com.br";
+let tipoAtendimento = 1;
+
+const LISTA_ASSUNTOS = [
+    { id: 1, key: "adesao", descricao: "Adesão" },
+    { id: 2, key: "beneficio", descricao: "Benefício" },
+    { id: 3, key: "cadastro", descricao: "Cadastro" },
+    { id: 4, key: "contribuiçãoprevidenciaria", descricao: "Contribuição previdenciária" },
+    { id: 5, key: "cancelamento", descricao: "Cancelamento" },
+    { id: 6, key: "concessaodebeneficio", descricao: "Concessão de Benefícios" },
+    { id: 7, key: "declaracao", descricao: "Declaração" },
+    { id: 8, key: "emprestimo", descricao: "Empréstimo" },
+    { id: 9, key: "financiamentoimobiliário", descricao: "Financiamento imobiliário" },
+    { id: 10, key: "impostoderenda", descricao: "Imposto de renda" },
+    { id: 12, key: "processosdeadesaodoacordo", descricao: "Processos de Adesão do acordo 2003" },
+    { id: 13, key: "recadastramento", descricao: "Recadastramento" },
+    { id: 14, key: "outros", descricao: "Outros" }
+];
 
 async function removerFeriadosDaLista(diasArray, mes, ano) {
-    const diasUteis = [];
-    for (let i = 0; i < diasArray.length; i++) {
-        const dia = diasArray[i];
+    const promessasFeriados = diasArray.map(async (dia) => {
         const dataFormatada = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-        
         try {
             const response = await fetch(`${API_URL_FERIADOS}/api/Atendimento/obterFeriado?dia=${dataFormatada}`);
             if (response.ok) {
                 const isFeriado = await response.json();
-                if (!isFeriado) {
-                    diasUteis.push(dia);
-                }
-            } else {
-                diasUteis.push(dia);
+                return isFeriado ? null : dia; 
             }
+            return dia;
         } catch (error) {
             console.error("Erro ao consultar feriado para o dia", dataFormatada, error);
-            diasUteis.push(dia);
+            return dia;
         }
-    }
-    return diasUteis;
+    });
+
+    const resultados = await Promise.all(promessasFeriados);
+    return resultados.filter(dia => dia !== null);
 }
 
 async function setupToken() {
@@ -53,8 +66,7 @@ async function setupToken() {
     }
 
     const authData = await authResponse.json();
-    token = authData.access_Token;
-    localStorage.setItem('authToken', token);
+    localStorage.setItem('authToken', authData.access_Token);
 }
 
 async function authFetch(url, options = {}) {
@@ -65,84 +77,67 @@ async function authFetch(url, options = {}) {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
         };
-        const dataResponse = await fetch(url, {
-            ...options,
-            headers
-        });
+        const dataResponse = await fetch(url, { ...options, headers });
 
         if (dataResponse.status === 401) {
             localStorage.removeItem("authToken");
             await setupToken();
-            getTimesOfToday();
+            return authFetch(url, options); 
         }
 
         if (dataResponse.status === 400) {
             const result = await dataResponse.json();
-            return {
-                status: dataResponse.status,
-                data: result[0]
-            }
+            return { status: dataResponse.status, data: result[0] };
         }
         if (dataResponse.status === 204) {
-            return {
-                status: dataResponse.status
-            }
+            return { status: dataResponse.status };
         }
         if (!dataResponse.ok) {
             if (dataResponse.status === 415) {
-            } else if (await dataResponse.json()) {
-                    const result = await dataResponse.json();
-                    return {
-                        error: result[0],
-                        status: dataResponse.status
-                    }
-                } else {
-                    return {
-                        status: dataResponse.status
-                    }
-                }
-        } else {
-            const data = await dataResponse.json();
-            return data;
-        }
+                return { status: dataResponse.status };
+            } else {
+                const result = await dataResponse.json();
+                return { error: result[0], status: dataResponse.status };
+            }
+        } 
+        
+        return await dataResponse.json();
 
     } catch (error) {
-        return error
+        return error;
     }
 }
 
+const api = authFetch;
+
 function clearError() {
-    $(".w-form-fail").css("display", "none");
-    $(".w-form-fail").text("");
+    $(".w-form-fail").css("display", "none").text("");
     $("#atendimento-presencial-submit, #atendimento-eletronico-submit").text("Enviar");
     preloader.style.display = "none";
 }
 
 function showFormFailMessage(message) {
-    $(".w-form-fail").css("display", "block");
-    $(".w-form-fail").text(message);
+    $(".w-form-fail").css("display", "block").text(message);
 }
 
 function addMask() {
-    $("#phone-01").mask("(99) 9 9999-9999");
-    $("#phone-02").mask("(99) 9 9999-9999");
-    $("#cpf-01").mask("999.999.999-99");
-    $("#cpf-02").mask("999.999.999-99");
-};
+    $("#phone-01, #phone-02").mask("(99) 9 9999-9999");
+    $("#cpf-01, #cpf-02").mask("999.999.999-99");
+}
 
 $(document).ready(function ($) {
-    $("#phone-01").mask("(99) 9 9999-9999");
-    $("#phone-02").mask("(99) 9 9999-9999");
-    $("#cpf-01").mask("999.999.999-99");
-    $("#cpf-02").mask("999.999.999-99");
+    addMask();
 });
 
 const loadingIcon = document.getElementById("loading-icon");
 const preloader = document.getElementById("preloader");
-loadingIcon.style.background = "#28343e";
-loadingIcon.style.padding = "10px";
-loadingIcon.style.borderRadius = "6px";
-loadingIcon.style.boxShadow = "0px 0px 0px 1px rgba(0, 0, 0, 0.1), 0px 2px 4px rgba(0, 0, 0, 0.2)";
+
+if (loadingIcon) {
+    loadingIcon.style.background = "#28343e";
+    loadingIcon.style.padding = "10px";
+    loadingIcon.style.borderRadius = "6px";
+    loadingIcon.style.boxShadow = "0px 0px 0px 1px rgba(0, 0, 0, 0.1), 0px 2px 4px rgba(0, 0, 0, 0.2)";
+}
 
 if (preloader) {
     preloader.style.display = "none";
@@ -160,22 +155,23 @@ function getElement(selector) {
 
 async function getPlans() {
     const response = await api(`${urlSchedule}/plano`);
-    const result = response;
     const planInput = $("#plan-input");
     const planInput2 = $("#plan-input-2");
+    
     planInput.empty();
     planInput2.empty();
-    $.each(result, function (index, value) {
-        planInput.append("<option value='" + value.id + "'>" + value.descricao + "</option>");
-        planInput2.append("<option value='" + value.id + "'>" + value.descricao + "</option>");
+    
+    $.each(response, function (index, value) {
+        const optionHTML = `<option value='${value.id}'>${value.descricao}</option>`;
+        planInput.append(optionHTML);
+        planInput2.append(optionHTML);
     });
-    planInput.val(result[0].id);
-    planInput2.val(result[0].id);
 
-    planInput.val(result[0].id);
-    planInput2.val(result[0].id);
-
-    carregarAssuntos(result[0].descricao);
+    if(response.length > 0) {
+        planInput.val(response[0].id);
+        planInput2.val(response[0].id);
+        carregarAssuntos(response[0].descricao);
+    }
 }
 
 async function getTimes({ day, year, month, atendimentoType }) {
@@ -185,313 +181,344 @@ async function getTimes({ day, year, month, atendimentoType }) {
     timeInput.empty();
     timeInput2.empty();
 
-    const attId = atendimentoType;
     try {
-        const response = await api(`${urlSchedule}/horarios/atendimento/${attId}/dia/${day}/mes/${month}/ano/${year}`);
-        const data = response;
-        if (data.status === 204) {
-            showFormFailMessage("Sem horarios disponível para está data");
+        const response = await api(`${urlSchedule}/horarios/atendimento/${atendimentoType}/dia/${day}/mes/${month}/ano/${year}`);
+        
+        if (response.status === 204) {
+            showFormFailMessage("Sem horários disponíveis para esta data");
             return;
-        } else {
-            if (data.error) {
-                console.log("error ===> ", data.error);
-                return;
-            }
-            clearError();
-            if (data.length) {
-                const horariosWithoutKeys = data.map(item => item.horarios);
+        } 
+        
+        if (response.error) {
+            console.log("error ===> ", response.error);
+            return;
+        }
 
-                timeInput.empty();
-                timeInput2.empty();
-
-                $.each(horariosWithoutKeys, function (index, value) {
-                    timeInput.append("<option value='" + value + "'>" + value + "</option>");
-                    timeInput2.append("<option value='" + value + "'>" + value + "</option>");
-                });
-                timeInput2.val(horariosWithoutKeys[0]);
-                timeInput.val(horariosWithoutKeys[0]);
-            }
+        clearError();
+        if (response.length) {
+            const horarios = response.map(item => item.horarios);
+            
+            $.each(horarios, function (index, value) {
+                const optionHTML = `<option value='${value}'>${value}</option>`;
+                timeInput.append(optionHTML);
+                timeInput2.append(optionHTML);
+            });
+            timeInput.val(horarios[0]);
+            timeInput2.val(horarios[0]);
         }
     } catch (error) {
-        console.log(error);
+        console.error(error);
     }
 }
 
 async function checkCPF(cpf) {
-    const response = await api(`${urlSchedule}/agendamento/validar/cpf/${cpf}`);
-    const data = (await response).json();
+    await api(`${urlSchedule}/agendamento/validar/cpf/${cpf}`);
 }
 
-function loadDaysOfMonth(selectElement, days) {
+function loadOptions(selectElement, items, isMonth = false) {
     selectElement.empty();
-    for (let day in days) {
-        const option = $("<option>").val(days[day]).text(days[day]);
-        selectElement.append(option);
+    for (let key in items) {
+        const item = items[key];
+        let val, text;
+        
+        if (isMonth) {
+            text = item.descricao.charAt(0).toUpperCase() + item.descricao.slice(1);
+            val = item.mes;
+        } else {
+            text = item;
+            val = item;
+        }
+        
+        selectElement.append($("<option>").val(val).text(text));
     }
 }
 
-function loadYears(selectElement, years) {
-    selectElement.empty();
-    for (let year in years) {
-        const option = $("<option>").val(years[year]).text(years[year]);
-        selectElement.append(option);
-    }
-}
+async function getCalendarioAtenimento() {
+    const dataAtual = new Date();
+    let mesAtual = dataAtual.getMonth() + 1;
+    let anoAtual = dataAtual.getFullYear();
+    let iteracoes = 0;
+    let calendarioData = null;
 
-function loadMonths(selectElement, months) {
-    selectElement.empty();
-    for (let month in months) {
-        const monthStr = months[month].descricao.charAt(0).toUpperCase() + months[month].descricao.slice(1)
-        const option = $("<option>").val(months[month].mes).text(monthStr);
-        selectElement.append(option);
-    }
-}
+    while (iteracoes < 12) {
+        iteracoes++;
+        try {  
+            calendarioData = await api(`${urlSchedule}/calendario/atendimento/${tipoAtendimento}/mes/${mesAtual}/ano/${anoAtual}`);							
+        } catch (erro) {
+            console.error("Erro:", erro); 
+        }
 
-var xyz = null;
-async function getCalendarioAtenimento(){
-	var dataAtual = new Date();
-	var mesAtual = dataAtual.getMonth();
-	var anoAtual = dataAtual.getFullYear()
-	
-	var i = 1
-	var parar = false;
-	var apiRequest = null;
-	while (parar === false) {
-		i++
-		if(i == 12) {
-			parar = true
-		}
-		 
-		apiRequest =  await (async () => {
-			try {  
-				return	api(`${urlSchedule}/calendario/atendimento/${tipoAtendimento}/mes/${mesAtual}/ano/${anoAtual}`);							
-			} catch (erro) {
-				console.error("Erro:", erro); 
-			}})();
-		
-		xyz = apiRequest
-		if(xyz[0].dias.length !== 0){
-			parar = true
-		}else{
-			mesAtual ++
-			if(mesAtual == 13){
-				mesAtual = 1;
-				anoAtual++;
-			}
-		}
-		 
-		if (parar) { 
-			break;  
-		}
-	}
-	xyz[0].ano = xyz[0].ano.filter(item => item >= anoAtual)
-	xyz[0].mes = xyz[0].mes.filter(item => item.mes >= mesAtual)
-	return xyz
+        if (calendarioData && calendarioData[0].dias.length !== 0) {
+            break;
+        } else {
+            mesAtual++;
+            if (mesAtual > 12) {
+                mesAtual = 1;
+                anoAtual++;
+            }
+        }
+    }
+
+    if (calendarioData) {
+        calendarioData[0].ano = calendarioData[0].ano.filter(item => item >= dataAtual.getFullYear());
+        calendarioData[0].mes = calendarioData[0].mes.filter(item => item.mes >= dataAtual.getMonth() + 1 || calendarioData[0].ano[0] > dataAtual.getFullYear());
+    }
+    
+    return calendarioData;
 }
 
 async function loadCalendar() {
-    preloader.style.display = "flex"
+    if(preloader) preloader.style.display = "flex";
     const response = await getCalendarioAtenimento();
-	xyz = response;
-    preloader.style.display = "none"
+    if(preloader) preloader.style.display = "none";
+    
+    if (!response || !response[0]) return;
     const result = response[0];
 
-    // --- NOVA INTEGRAÇÃO: FILTRA OS FERIADOS DA LISTA INICIAL ---
     const mesParaFiltrar = result.mes[0]?.mes || new Date().getMonth() + 1;
     const anoParaFiltrar = result.ano[0] || new Date().getFullYear();
+    
     result.dias = await removerFeriadosDaLista(result.dias, mesParaFiltrar, anoParaFiltrar);
-    // -----------------------------------------------------------
 
-    const diaEleme = $("#dia-input");
-    const diaEleme2 = $("#dia-input-2");
-    const mesElem = $("#mes-input");
-    const mesElem2 = $("#mes-input-2")
-    const ano1 = $("#year-input");
-    const ano2 = $("#year-input-2")
+    loadOptions($("#dia-input"), result.dias);
+    loadOptions($("#dia-input-2"), result.dias);
+    loadOptions($("#mes-input"), result.mes, true);
+    loadOptions($("#mes-input-2"), result.mes, true);
+    loadOptions($("#year-input"), result.ano);
+    loadOptions($("#year-input-2"), result.ano);
 
-    loadDaysOfMonth(diaEleme, result.dias)
-    loadDaysOfMonth(diaEleme2, result.dias)
-    loadMonths(mesElem, result.mes)
-    loadMonths(mesElem2, result.mes)
-    loadYears(ano1, result.ano)
-    loadYears(ano2, result.ano)
-
-    getTimesOfToday()
+    await getTimesOfToday();
 }
 
 async function getTimesOfToday() {
-    const day = $(tipoAtendimento === 1 ? "#dia-input" : "#dia-input-2").val();
-    const month = $(tipoAtendimento === 1 ? "#mes-input" : "#mes-input-2").val();
-    const year = $(tipoAtendimento === 1 ? "#year-input" : "#year-input-2").val();
+    const isPresencial = tipoAtendimento === 1;
+    const day = $(isPresencial ? "#dia-input" : "#dia-input-2").val();
+    const month = $(isPresencial ? "#mes-input" : "#mes-input-2").val();
+    const year = $(isPresencial ? "#year-input" : "#year-input-2").val();
 	
-    getTimes({
-        day,
-        year,
-        month: month,
-        atendimentoType: tipoAtendimento
-    });
+    if(day && month && year) {
+        await getTimes({ day, year, month, atendimentoType: tipoAtendimento });
+    }
 }
 
 async function isAttendAlreadyExist({ typeAtt, cpf }) {
     const response = await api(`${urlSchedule}/agendamento/existe/atendimento/${typeAtt}/cpf/${cpf}`);
-    const result = response;
-
-    if (result.status === 400) {
+    if (response.status === 400) {
         clearError();
         showFormFailMessage("CPF não encontrado");
         return false;
-    } else {
-        clearError();
-        const data = response;
-        return true;
     }
+    clearError();
+    return true;
 }
 
 async function scheduleAttend(data) {
     clearError();
-    $("#atendimento-presencial-submit, #atendimento-eletronico-submit").prop("disabled", true);
-    $("#atendimento-presencial-submit, #atendimento-eletronico-submit").text("carregando...");
+    const submitBtns = $("#atendimento-presencial-submit, #atendimento-eletronico-submit");
+    submitBtns.prop("disabled", true).text("carregando...");
 
     const response = await api(`${urlSchedule}/agendamento/criar`, {
         method: "POST",
         body: JSON.stringify(data)
     });
 
-    $("#atendimento-presencial-submit, #atendimento-eletronico-submit").prop("disabled", false);
-    $("#atendimento-presencial-submit, #atendimento-eletronico-submit").text("Enviar");
+    submitBtns.prop("disabled", false).text("Enviar");
 
-    if (response.id) {
-         await loadCalendar()
-        $(".tab-button-box, .c-input-form, .c-input-form, .c-input-form, .c-input-tab, .c-input-form ").css("display", "none");
+    if (response && response.id) {
+        await loadCalendar();
+        $(".tab-button-box, .c-input-form, .c-input-tab").css("display", "none");
         $(".w-form-done").css("display", "block");
-    } else {
+    } else if (response && response.data) {
         showFormFailMessage(response.data);
+    } else {
+        showFormFailMessage("Erro ao realizar agendamento.");
     }
 }
 
 async function loadScript() {
     await setupToken();
-    await loadCalendar()
+    await loadCalendar();
 
-     $("#dia-input, #dia-input-2").change(async function () {
+    const seletorDias = "#dia-input, #dia-input-2";
+    const seletorMeses = "#mes-input, #mes-input-2";
+    const seletorAnos = "#year-input, #year-input-2";
+
+    $(seletorDias).change(async function () {
         clearError();
-        const day = $(tipoAtendimento === 1 ? "#dia-input" : "#dia-input-2").val();
-        const month = $(tipoAtendimento === 1 ? "#mes-input" : "#mes-input-2").val();
-        const year = $(tipoAtendimento === 1 ? "#year-input" : "#year-input-2").val();
-
+        const isPresencial = tipoAtendimento === 1;
         getTimes({
-            day,
-            year,
-            month: Number(month),
+            day: $(isPresencial ? "#dia-input" : "#dia-input-2").val(),
+            year: $(isPresencial ? "#year-input" : "#year-input-2").val(),
+            month: Number($(isPresencial ? "#mes-input" : "#mes-input-2").val()),
             atendimentoType: tipoAtendimento
         });
     });
 
-     $("#mes-input, #mes-input-2").change(async function () {
+    $(seletorMeses).change(async function () {
         clearError();
         const month = $(this).val();
-        const year = $(tipoAtendimento === 1 ? "#year-input" : "#year-input-2").val();
+        const isPresencial = tipoAtendimento === 1;
+        const year = $(isPresencial ? "#year-input" : "#year-input-2").val();
 
-        preloader.style.display = "flex";
+        if(preloader) preloader.style.display = "flex";
         const response = await api(`${urlSchedule}/calendario/atendimento/${tipoAtendimento}/mes/${month}/ano/${year}`);
-        preloader.style.display = "none";
-        const result = response[0];
+        if(preloader) preloader.style.display = "none";
+        
+        if (response && response[0]) {
+            const result = response[0];
+            result.dias = await removerFeriadosDaLista(result.dias, month, year);
 
-        // --- NOVA INTEGRAÇÃO: FILTRA QUANDO TROCA O MÊS ---
-        result.dias = await removerFeriadosDaLista(result.dias, month, year);
-        // --------------------------------------------------
+            loadOptions($("#dia-input"), result.dias);
+            loadOptions($("#dia-input-2"), result.dias);
 
-        const diaEleme = $("#dia-input");
-        const diaEleme2 = $("#dia-input-2");
-
-        loadDaysOfMonth(diaEleme, result.dias)
-        loadDaysOfMonth(diaEleme2, result.dias)
-
-        const day = $(tipoAtendimento === 1 ? "#dia-input" : "#dia-input-2").val();
-
-        getTimes({
-            day,
-            year,
-            month: Number(month),
-            atendimentoType: tipoAtendimento
-        });
+            getTimes({
+                day: $(isPresencial ? "#dia-input" : "#dia-input-2").val(),
+                year,
+                month: Number(month),
+                atendimentoType: tipoAtendimento
+            });
+        }
     });
 
-    $("#year-input, #year-input-2").change(async function () {
+    $(seletorAnos).change(async function () {
         clearError();
         const year = $(this).val();
+        const isPresencial = tipoAtendimento === 1;
 
-        preloader.style.display = "flex";
+        if(preloader) preloader.style.display = "flex";
         const response = await api(`${urlSchedule}/calendario/atendimento/${tipoAtendimento}/ano/${year}`);
-        preloader.style.display = "none";
-        const result = response[0];
+        if(preloader) preloader.style.display = "none";
+        
+        if (response && response[0]) {
+            const result = response[0];
+            const mesAtualSelect = $(isPresencial ? "#mes-input" : "#mes-input-2").val() || new Date().getMonth() + 1;
+            
+            result.dias = await removerFeriadosDaLista(result.dias, mesAtualSelect, year);
 
-        const mesAtualSelect = $(tipoAtendimento === 1 ? "#mes-input" : "#mes-input-2").val() || new Date().getMonth() + 1;
-        result.dias = await removerFeriadosDaLista(result.dias, mesAtualSelect, year);
+            loadOptions($("#dia-input"), result.dias);
+            loadOptions($("#dia-input-2"), result.dias);
+            loadOptions($("#mes-input"), result.mes, true);
+            loadOptions($("#mes-input-2"), result.mes, true);
 
-        const diaEleme = $("#dia-input");
-        const diaEleme2 = $("#dia-input-2");
-        const mesElem = $("#mes-input");
-        const mesElem2 = $("#mes-input-2")
-
-        loadDaysOfMonth(diaEleme, result.dias)
-        loadDaysOfMonth(diaEleme2, result.dias)
-        loadMonths(mesElem, result.mes)
-        loadMonths(mesElem2, result.mes)
-
-        getTimes({
-            day: $(tipoAtendimento === 1 ? "#dia-input" : "#dia-input-2").val(),
-            year,
-            month: Number($(tipoAtendimento === 1 ? "#mes-input" : "#mes-input-2").val()),
-            atendimentoType: tipoAtendimento
-        });
+            getTimes({
+                day: $(isPresencial ? "#dia-input" : "#dia-input-2").val(),
+                year,
+                month: Number($(isPresencial ? "#mes-input" : "#mes-input-2").val()),
+                atendimentoType: tipoAtendimento
+            });
+        }
     });
 
     $("#atendimento-eletronico-input").click(async function () {
         clearError();
         addMask();
-        await getPlans();
         tipoAtendimento = 2;
-        loadCalendar()
+        await getPlans();
+        await loadCalendar();
     });
 
     $("#atendimento-presencial-input").click(async function () {
         clearError();
         addMask();
-        await getPlans();
         tipoAtendimento = 1;
-        loadCalendar()
+        await getPlans();
+        await loadCalendar();
     });
 
-    await  getPlans();
-    $("#dia-input, #mes-input, #year-input, #plan-input,#mes-input-2, #year-input-2, #plan-input-2, #phone-01,#phone-02, #time - input - 2, #email - input, #email - input - 2, #assunto - input").change(function () {
+    await getPlans();
+    
+    const allInputs = "#dia-input, #mes-input, #year-input, #plan-input, #mes-input-2, #year-input-2, #plan-input-2, #phone-01, #phone-02, #time-input-2, #horario-2, #email-input, #email-input-2, #assunto-input";
+    $(allInputs).change(function () {
         clearError();
-    })
+    });
+}
+
+function obterAssuntoEspecial(planoSelecionado) {
+    const isEspecial = planoSelecionado === "Plano CV I" || planoSelecionado === "Família";
+    return {
+        id: isEspecial ? 15 : 11,
+        key: isEspecial ? "portabilidade" : "institutosprevidenciarios",
+        descricao: isEspecial ? "Desafio Portabilidade" : "Institutos previdenciários"
+    };
+}
+
+function carregarAssuntos(planoSelecionadoTexto) {
+    const assuntoSelect = document.getElementById("assunto-input");
+    if (!assuntoSelect) return;
+
+    const assuntoEspecial = obterAssuntoEspecial(planoSelecionadoTexto);
+    
+    const listaCompleta = [
+        ...LISTA_ASSUNTOS.filter(a => a.key !== "portabilidade" && a.key !== "institutosprevidenciarios"),
+        assuntoEspecial
+    ].sort((a, b) => a.descricao.localeCompare(b.descricao));
+
+    assuntoSelect.innerHTML = "";
+    listaCompleta.forEach(assunto => {
+        const option = document.createElement("option");
+        option.value = assunto.key;
+        option.text = assunto.descricao;
+        assuntoSelect.appendChild(option);
+    });
+}
+
+document.getElementById("plan-input-2")?.addEventListener("change", function () {
+    const planoSelecionadoTexto = this.options[this.selectedIndex].text;
+    carregarAssuntos(planoSelecionadoTexto);
+});
+
+document.getElementById("plan-input")?.addEventListener("change", function () {
+    const planoSelecionadoTexto = this.options[this.selectedIndex].text;
+    carregarAssuntos(planoSelecionadoTexto);
+});
+
+async function getAssuntoInputValue() {
+    try {
+        const assuntoSelecionado = document.querySelector('#assunto-input')?.value;
+        if (!assuntoSelecionado) return 0;
+
+        const isPresencial = tipoAtendimento === 1;
+        const planoSelecionado = document.querySelector(isPresencial ? "#plan-input" : "#plan-input-2").selectedOptions[0].text;
+        const assuntoEspecial = obterAssuntoEspecial(planoSelecionado);
+
+        if (assuntoSelecionado === assuntoEspecial.key) {
+            return assuntoEspecial.id;
+        }
+
+        const assuntoEncontrado = LISTA_ASSUNTOS.find(x => x.key === assuntoSelecionado);
+        return assuntoEncontrado ? assuntoEncontrado.id : 0;
+
+    } catch (e) {
+        return 0;
+    }
 }
 
 async function createRegistration() {
     clearError();
-    const phoneValue = getElement(tipoAtendimento === 1 ? "#phone-01" : "#phone-02").value;
-    const cpfInputValue = getElement(tipoAtendimento === 1 ? "#cpf-01" : "#cpf-02").value;
-    const timeInputValue = getElement(tipoAtendimento === 1 ? "#time-input-2" : "#horario-2").value;
-    const planInputValue = getElement(tipoAtendimento === 1 ? "#plan-input" : "#plan-input-2").value;
-    const emailInputValue = getElement(tipoAtendimento === 1 ? "#email-input" : "#email-input-2").value;
-    const assuntoInputValue = getElement("#assunto-input") ? getElement("#assunto-input").value : "";
-    const day = getElement(tipoAtendimento === 1 ? "#dia-input" : "#dia-input-2").value;
-    const month = getElement(tipoAtendimento === 1 ? "#mes-input" : "#mes-input-2").value;
-    const year = getElement(tipoAtendimento === 1 ? "#year-input" : "#year-input-2").value;
-    const phoneDDD = phoneValue.replace("(", "").replace(")", "").substring(0, 3);
-    const phoneRest = phoneValue.replace("(", "").replace(")", "").substring(3);
+    const isPresencial = tipoAtendimento === 1;
+    
+    const phoneValue = getElement(isPresencial ? "#phone-01" : "#phone-02").value;
+    const cpfInputValue = getElement(isPresencial ? "#cpf-01" : "#cpf-02").value;
+    const timeInputValue = getElement(isPresencial ? "#time-input-2" : "#horario-2").value;
+    const planInputValue = getElement(isPresencial ? "#plan-input" : "#plan-input-2").value;
+    const emailInputValue = getElement(isPresencial ? "#email-input" : "#email-input-2").value;
+    const day = getElement(isPresencial ? "#dia-input" : "#dia-input-2").value;
+    const month = getElement(isPresencial ? "#mes-input" : "#mes-input-2").value;
+    const year = getElement(isPresencial ? "#year-input" : "#year-input-2").value;
+
+    const phoneDDD = phoneValue.replace(/\D/g, '').substring(0, 2);
+    const phoneRest = phoneValue.replace(/\D/g, '').substring(2);
+    const cpfLimpo = cpfInputValue.replace(/\D/g, "");
 
     if (cpfInputValue && timeInputValue && planInputValue && emailInputValue && phoneValue) {
-        preloader.style.display = "flex";
+        if(preloader) preloader.style.display = "flex";
 
         const resultCPF = await isAttendAlreadyExist({
-            cpf: cpfInputValue.replace(/\./g, "").replace("-", ""),
+            cpf: cpfLimpo,
             typeAtt: tipoAtendimento
         });
 
-        var setAssunto = await getAssuntoInputValue();
+        const setAssunto = await getAssuntoInputValue();
 
         if (resultCPF) {
             const raw = {
@@ -501,102 +528,24 @@ async function createRegistration() {
                 plano: planInputValue,
                 assunto: setAssunto,
                 horario: timeInputValue,
-                cpf: cpfInputValue.replace(/\./g, "").replace("-", ""),
-                ddd: phoneDDD.replace(" ", ""),
-                telefone: phoneRest.replace(" ", "").replace("-", ""),
+                cpf: cpfLimpo,
+                ddd: phoneDDD,
+                telefone: phoneRest,
                 email: emailInputValue,
                 tipoAtendimento: tipoAtendimento,
             };
 
             await scheduleAttend(raw);
-            preloader.style.display = "none";
         }
+        
         $("#atendimento-presencial-submit, #atendimento-eletronico-submit").text("Enviar");
-        preloader.style.display = "none";
-        return;
+        if(preloader) preloader.style.display = "none";
     } else {
         showFormFailMessage("Todos os campos são obrigatórios");
-        return;
     }
 }
 
-function carregarAssuntos(planoSelecionadoTexto) {
-    const assuntoSelect = document.getElementById("assunto-input");
-    const listaAssuntos = [
-        { id: "adesao", descricao: "Adesão" },
-        { id: "beneficio", descricao: "Benefício" },
-        { id: "cadastro", descricao: "Cadastro" },
-        { id: "contribuiçãoprevidenciaria", descricao: "Contribuição previdenciária" },
-        { id: "cancelamento", descricao: "Cancelamento" },
-        { id: "concessaodebeneficio", descricao: "Concessão de Benefícios" },
-        { id: "declaracao", descricao: "Declaração" },
-        { id: "emprestimo", descricao: "Empréstimo" },
-        { id: "financiamentoimobiliário", descricao: "Financiamento imobiliário" },
-        { id: "impostoderenda", descricao: "Imposto de renda" },
-        {
-            id: (planoSelecionadoTexto === "Plano CV I" || planoSelecionadoTexto === "Família") ? "portabilidade" : "institutosprevidenciarios",
-            descricao: (planoSelecionadoTexto === "Plano CV I" || planoSelecionadoTexto === "Família") ? "Desafio Portabilidade" : "Institutos previdenciários"
-        },
-        { id: "processosdeadesaodoacordo", descricao: "Processos de Adesão do acordo 2003" },
-        { id: "recadastramento", descricao: "Recadastramento" },
-        { id: "outros", descricao: "Outros" }
-    ];
-
-    assuntoSelect.innerHTML = "";
-    listaAssuntos.forEach(assunto => {
-        const option = document.createElement("option");
-        option.value = assunto.id;
-        option.text = assunto.descricao;
-        assuntoSelect.appendChild(option);
-    });
-}
-
-document.getElementById("plan-input-2").addEventListener("change", function () {
-    const planoSelecionadoTexto = this.options[this.selectedIndex].text;
-    carregarAssuntos(planoSelecionadoTexto);
-});
-
-async function getAssuntoInputValue() {
-    try {
-        const assuntoSelecionado = document.querySelector('#assunto-input').value;
-        if (!assuntoSelecionado) return 0;
-
-        const planoSelecionado = document.querySelector(tipoAtendimento === 1 ? "#plan-input" : "#plan-input-2").selectedOptions[0].text;
-
-        const lista = [
-            { id: 1, descricao: "Adesão", key: "adesao" },
-            { id: 2, descricao: "Benefício", key: "beneficio" },
-            { id: 3, descricao: "Cadastro", key: "cadastro" },
-            { id: 4, descricao: "Contribuição Previdenciária", key: "contribuiçãoprevidenciaria" },
-            { id: 5, descricao: "Cancelamento", key: "cancelamento" },
-            { id: 6, descricao: "Concessão de Benefícios", key: "concessaodebeneficio" },
-            { id: 7, descricao: "Declaração", key: "declaracao" },
-            { id: 8, descricao: "Empréstimo", key: "emprestimo" },
-            { id: 9, descricao: "Financiamento Imobiliário", key: "financiamentoimobiliário" },
-            { id: 10, descricao: "Imposto de Renda", key: "impostoderenda" },
-            {
-                id: (planoSelecionado === "Plano CV I" || planoSelecionado === "Família") ? 15 : 11,
-                descricao: (planoSelecionado === "Plano CV I" || planoSelecionado === "Família") ? "Desafio Portabilidade" : "Institutos Previdenciários",
-                key: (planoSelecionado === "Plano CV I" || planoSelecionado === "Família") ? "portabilidade" : "institutosprevidenciarios"
-            },
-            { id: 12, descricao: "Processo de Adesão do Acordo 2003", key: "processosdeadesaodoacordo" },
-            { id: 13, descricao: "Recadastramento", key: "recadastramento" },
-            { id: 14, descricao: "Outros", key: "outros" }
-        ];
-
-        return lista.find(x => x.key === assuntoSelecionado)?.id || 0;
-
-    } catch (e) {
-        return 0;
-    }
-}
-
-let tipoAtendimento = 1;
-var urlSchedule = "https://apiagendamento.capef.com.br"; 
-const api = authFetch; 
-
-loadCalendar();
 loadScript();
 
-document.querySelector("#atendimento-presencial-submit").addEventListener("click", createRegistration);
-document.getElementById("atendimento-eletronico-submit").addEventListener("click", createRegistration);
+document.querySelector("#atendimento-presencial-submit")?.addEventListener("click", createRegistration);
+document.getElementById("atendimento-eletronico-submit")?.addEventListener("click", createRegistration);
