@@ -5,15 +5,14 @@ Este repositório armazena os arquivos de integração do sistema de agendamento
 ## 🚀 Funcionalidades
 *   **Gestão de Calendário:** Integração com feriados dinâmicos via `removerFeriadosDaLista`.
 *   **Performance:** Uso de requisições em paralelo (`Promise.all`) para carregamento otimizado.
-*   **Segurança:** Implementação de autenticação via token e mascaramento de campos (CPF/Telefone).
-*   **Estabilidade:** Otimização para evitar *Layout Shifts* (CLS) e carregamento assíncrono para preservar a thread principal.
+*   **Segurança:** Implementação de  mascaramento de campos (CPF/Telefone).
 
 ## 📁 Estrutura do Projeto
 *   `agendamento.js`: Script principal de integração.
 *   `README.md`: Documentação.
 
 ## ⚙️ Configurações Importantes
-*   **Endpoints:** O script consome APIs hospedadas em `apiagendamento.capef.com.br` e `apiarearestritagenericainthm.capef.com.br`.
+*   **Endpoints(HML):** O script consome APIs hospedadas em `apiagendamento.capef.com.br` e `apiarearestritagenericainthm.capef.com.br`.
 *   **CORS:** Certifique-se de que o backend esteja configurado para aceitar requisições de origem cruzada para os domínios da Capef.
 *   **Segurança:** As credenciais de autenticação (`authUserName`, `authPassword`) são gerenciadas internamente para comunicação com a API de tokens.
 
