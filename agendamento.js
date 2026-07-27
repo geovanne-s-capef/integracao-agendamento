@@ -9,7 +9,7 @@ document.addEventListener("keydown", (e) => {
     }
 });
 
-const API_URL_FERIADOS = "https://apiarearestritagenericahm.capef.com.br";
+const API_URL_FERIADOS = "https://apiarearestritagenerica.capef.com.br";
 const urlSchedule = "https://apiagendamento.capef.com.br";
 let tipoAtendimento = 1;
 
